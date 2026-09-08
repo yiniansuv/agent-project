@@ -1,2 +1,7 @@
-".env" 
-"Agent×ÔÑ§±Ê¼Ç.txt" 
+.env
+venv/
+__pycache__/
+*.pyc
+Agentè‡ªå­¦ç¬”è®°.txt
+AgentA.txt
+test.txt
