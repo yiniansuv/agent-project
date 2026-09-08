@@ -1,0 +1,89 @@
+跑通Demo：
+
+创建项目文件
+创建虚拟环境
+Windows：python -m venv venv 、venv\Scripts\activate
+安装核心依赖：pip install langchain langgraph langchain-openai langchain-community duckduckgo-search python-dotenv
+
+获取大模型api
+DeepSeek 开放平台官网：https://platform.deepseek.com
+把api写进.env文件里面,命令行快速创建.env文件命令type nul > .env
+
+1.项目背景与目标
+目标：跑通第一个能用的 Agent Demo，让它能调用“搜索”和“Python代码执行”工具。
+大模型：DeepSeek (兼容OpenAI接口)。
+最终效果：Agent 成功搜索上海天气，并自动计算华氏温度。
+
+2.项目文件结构
+D:\Agent项目\
+│
+├── venv/                      # Python虚拟环境
+├── minimal_agent.py           # 主程序（最终版代码）
+├── .env                       # 环境变量（存放密钥，务必加入.gitignore）
+└── requirements.txt           # (可选) 依赖清单
+
+3.env文件下的代码
+OPENAI_API_KEY="sk-真实DeepSeek密钥"
+OPENAI_BASE_URL="https://api.deepseek.com/v1"
+
+4.python文件下的代码
+import os
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from langchain_community.tools import DuckDuckGoSearchRun
+from langchain_experimental.utilities import PythonREPL
+from langchain.tools import tool
+from langchain.agents import create_agent
+
+load_dotenv()
+
+# 1. 初始化大模型 (DeepSeek)
+llm = ChatOpenAI(
+    model="deepseek-chat",
+    base_url=os.getenv("OPENAI_BASE_URL"),
+    api_key=os.getenv("OPENAI_API_KEY"),
+    temperature=0
+)
+
+# 2. 定义工具
+# 工具A：网络搜索（直接使用）
+search = DuckDuckGoSearchRun()
+
+# 工具B：Python解释器（需要用 @tool 装饰器包装才能被Agent识别）
+@tool
+def python_repl_tool(code: str) -> str:
+    """执行一段Python代码并返回输出结果。"""
+    repl = PythonREPL()
+    return repl.run(code)
+
+tools = [search, python_repl_tool]
+
+# 3. 创建Agent（使用新版 langchain.agents.create_agent）
+agent = create_agent(
+    model=llm,
+    tools=tools,
+    system_prompt="你是一个有用的助手，可以使用搜索和Python代码执行工具来回答问题。"
+)
+
+# 4. 运行并输出
+result = agent.invoke({
+    "messages": [("user", "告诉我今天上海的天气，然后用Python计算一下华氏温度。")]
+})
+print(result["messages"][-1].content)
+
+
+5.完整报错记录
+
+序号	                             报错信息 (Error)	                                                                          原因分析	                                                             解决方案
+1	ModuleNotFoundError: No module named 'dotenv'	未安装 python-dotenv	pip install python-dotenv
+2	ModuleNotFoundError: No module named 'langchain_openai'	未安装 langchain-openai	pip install langchain-openai langchain-community langchain-experimental
+3	ImportError: cannot import name 'create_react_agent' from 'langchain.agents'	LangChain v1.0 移除了旧API	改用 from langgraph.prebuilt import create_react_agent (第一次迁移)
+4	ImportError: cannot import name 'AgentExecutor'	LangChain v1.0 不再使用 AgentExecutor	删掉 AgentExecutor，直接使用 agent.invoke()
+5	ImportError: cannot import name 'hub' from 'langchain'	旧版 hub 导入方式失效	删除 from langchain import hub，改为在 create_agent 中直接写 system_prompt
+6	ModuleNotFoundError: No module named 'ddgs'	DuckDuckGo 底层依赖缺失	pip install -U ddgs
+7	ValueError: ... Got <class 'langchain_experimental.utilities.python.PythonREPL'>	PythonREPL 只是类，不是标准工具格式	使用 @tool 装饰器将其包装成函数 python_repl_tool
+8	LangGraphDeprecatedSinceV10: create_react_agent moved	LangGraph 也弃用了该函数	最终迁移至 from langchain.agents import create_agent (最终版)
+9	openai.PermissionDeniedError: unsupported_country_region_territory	Base URL 配置缺少 /v1 后缀	修改 .env 中的 OPENAI_BASE_URL 为   https://api.deepseek.com/v1
+
+6.最终安装的全部依赖清单命令
+pip install langchain langchain-openai langchain-community langchain-experimental langgraph python-dotenv ddgs
